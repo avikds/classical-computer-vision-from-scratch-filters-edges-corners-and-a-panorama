@@ -1598,3 +1598,66 @@ def corner_repeatability(pts1, pts2, H, shape2, tol=1.5):
 
     return float(repeatability)
 
+# Step 20 - ransac_num_iterations
+def ransac_num_iterations(p, w, s):
+    """
+    Calculate the number of RANSAC iterations required to obtain
+    at least one sample containing only inliers.
+
+    Parameters
+    ----------
+    p : float
+        Desired probability (confidence) of selecting at least
+        one all-inlier sample. Must satisfy 0 < p < 1.
+
+    w : float
+        Estimated fraction of inliers in the dataset.
+        Must satisfy 0 < w <= 1.
+
+    s : int
+        Number of points selected in each random sample.
+        Must satisfy s >= 1.
+
+    Returns
+    -------
+    int
+        Minimum number of random samples required to achieve
+        the specified confidence.
+
+    Raises
+    ------
+    ValueError
+        If p, w, or s does not satisfy the required constraints.
+    """
+
+    # Validate the desired confidence probability.
+    if not (0 < p < 1):
+        raise ValueError("p must satisfy 0 < p < 1.")
+
+    # Validate the estimated inlier fraction.
+    if not (0 < w <= 1):
+        raise ValueError("w must satisfy 0 < w <= 1.")
+
+    # Validate the minimum sample size.
+    if not (s >= 1):
+        raise ValueError("s must be greater than or equal to 1.")
+
+    # Calculate the probability that one random sample
+    # contains only inliers.
+    all_inlier_probability = w ** s
+
+    # If every sample contains only inliers, one iteration is sufficient.
+    if all_inlier_probability == 1:
+        return 1
+
+    # Calculate the required number of iterations using
+    # the RANSAC confidence formula.
+    numerator = np.log1p(-p)
+    denominator = np.log1p(-all_inlier_probability)
+
+    # Round upward because the number of iterations must be an integer
+    # and must satisfy the requested confidence.
+    iterations = int(np.ceil(numerator / denominator))
+
+    return iterations
+

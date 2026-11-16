@@ -29,6 +29,7 @@ python scaffold.py
 - [x] **17.** describe_patches
 - [x] **18.** match_descriptors
 - [x] **19.** corner_repeatability
+- [x] **20.** ransac_num_iterations
 
 ---
 
