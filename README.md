@@ -31,6 +31,7 @@ python scaffold.py
 - [x] **19.** corner_repeatability
 - [x] **20.** ransac_num_iterations
 - [x] **21.** ransac_homography
+- [x] **22.** homography_corner_error
 
 ---
 

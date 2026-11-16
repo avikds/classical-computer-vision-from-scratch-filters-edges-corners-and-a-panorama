@@ -1865,3 +1865,53 @@ def ransac_homography(p1, p2, thresh=1.0, max_iters=2000, p=0.99, rng=None):
     # Return the final homography, Boolean inlier mask, and trial count.
     return H, inliers, trials
 
+# Step 22 - homography_corner_error
+def homography_corner_error(H_est, H_true, shape):
+    """
+    Measure homography estimation error using the four image corners.
+
+    Parameters
+    ----------
+    H_est : np.ndarray
+        Estimated 3 x 3 homography matrix.
+
+    H_true : np.ndarray
+        Ground-truth 3 x 3 homography matrix.
+
+    shape : tuple
+        Source image dimensions as (height, width).
+
+    Returns
+    -------
+    float
+        Mean Euclidean distance, in pixels, between the four
+        corners mapped by the estimated and true homographies.
+    """
+
+    # Extract the source image height and width.
+    h, w = shape
+
+    # Define the four image corners in (x, y) = (column, row) order.
+    corners = np.array([
+        [0.0, 0.0],
+        [w - 1.0, 0.0],
+        [w - 1.0, h - 1.0],
+        [0.0, h - 1.0]
+    ], dtype=float)
+
+    # Map the four corners using the estimated homography.
+    estimated_corners = apply_homography(H_est, corners)
+
+    # Map the same corners using the ground-truth homography.
+    true_corners = apply_homography(H_true, corners)
+
+    # Calculate the Euclidean distance between corresponding
+    # transformed corners.
+    corner_distances = np.linalg.norm(
+        estimated_corners - true_corners,
+        axis=1
+    )
+
+    # Return the mean corner error as a Python float.
+    return float(np.mean(corner_distances))
+
