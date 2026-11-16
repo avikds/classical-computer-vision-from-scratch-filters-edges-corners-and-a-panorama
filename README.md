@@ -32,6 +32,7 @@ python scaffold.py
 - [x] **20.** ransac_num_iterations
 - [x] **21.** ransac_homography
 - [x] **22.** homography_corner_error
+- [x] **23.** bilinear_sample
 
 ---
 

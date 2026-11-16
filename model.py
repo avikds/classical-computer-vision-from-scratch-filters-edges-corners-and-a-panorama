@@ -1915,3 +1915,108 @@ def homography_corner_error(H_est, H_true, shape):
     # Return the mean corner error as a Python float.
     return float(np.mean(corner_distances))
 
+# Step 23 - bilinear_sample
+def bilinear_sample(img, x, y):
+    """
+    Sample an image at real-valued positions using bilinear interpolation.
+
+    Parameters
+    ----------
+    img : np.ndarray
+        2-D grayscale input image with dimensions (H, W).
+        Both dimensions must be at least 2.
+
+    x : np.ndarray
+        Array of x-coordinates (column indices).
+
+    y : np.ndarray
+        Array of y-coordinates (row indices).
+
+        Both coordinate arrays must have the same shape.
+
+    Returns
+    -------
+    values : np.ndarray
+        Floating-point array containing interpolated image values.
+        Invalid sampling positions are assigned 0.0.
+
+    valid : np.ndarray
+        Boolean array indicating whether each sampling position
+        lies inside the image boundaries.
+    """
+
+    # Convert inputs to floating-point NumPy arrays.
+    img = np.asarray(img, dtype=float)
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+
+    # Validate the input image.
+    if img.ndim != 2:
+        raise ValueError("img must be a 2-D grayscale image.")
+
+    # Bilinear interpolation requires at least a 2 x 2 image.
+    if img.shape[0] < 2 or img.shape[1] < 2:
+        raise ValueError("Image dimensions must be at least 2 x 2.")
+
+    # Ensure that both coordinate arrays have identical shapes.
+    if x.shape != y.shape:
+        raise ValueError("x and y must have the same shape.")
+
+    # Get image dimensions.
+    h, w = img.shape
+
+    # Step 1: Identify valid sampling positions.
+    # A position is valid only when it lies inside the image boundaries.
+    valid = (
+        np.isfinite(x) &
+        np.isfinite(y) &
+        (x >= 0) &
+        (x <= w - 1) &
+        (y >= 0) &
+        (y <= h - 1)
+    )
+
+    # Step 2: Replace non-finite coordinates temporarily
+    # to avoid invalid integer conversions.
+    safe_x = np.where(np.isfinite(x), x, 0.0)
+    safe_y = np.where(np.isfinite(y), y, 0.0)
+
+    # Clip coordinates to the valid image range.
+    safe_x = np.clip(safe_x, 0, w - 1)
+    safe_y = np.clip(safe_y, 0, h - 1)
+
+    # Step 3: Calculate the upper-left integer pixel coordinates.
+    x0 = np.floor(safe_x).astype(int)
+    y0 = np.floor(safe_y).astype(int)
+
+    # At the last column or row, shift the base coordinate
+    # backward by one pixel so that the interpolation uses
+    # the final two image pixels without accessing outside the image.
+    x0 = np.minimum(x0, w - 2)
+    y0 = np.minimum(y0, h - 2)
+
+    # Step 4: Calculate the fractional distances.
+    fx = safe_x - x0
+    fy = safe_y - y0
+
+    # Step 5: Retrieve the four neighboring pixel values.
+    I00 = img[y0,     x0]
+    I01 = img[y0,     x0 + 1]
+    I10 = img[y0 + 1, x0]
+    I11 = img[y0 + 1, x0 + 1]
+
+    # Step 6: Perform bilinear interpolation.
+    # Interpolate horizontally and vertically using the
+    # fractional coordinate weights.
+    values = (
+        (1 - fx) * (1 - fy) * I00 +
+        fx       * (1 - fy) * I01 +
+        (1 - fx) * fy       * I10 +
+        fx       * fy       * I11
+    )
+
+    # Step 7: Assign zero to positions outside the image.
+    values = np.where(valid, values, 0.0)
+
+    return values.astype(float), valid
+
