@@ -2020,3 +2020,82 @@ def bilinear_sample(img, x, y):
 
     return values.astype(float), valid
 
+# Step 24 - warp_image
+def warp_image(img, H, out_shape):
+    """
+    Warp an image onto an output grid using inverse mapping
+    and bilinear interpolation.
+
+    Parameters
+    ----------
+    img : np.ndarray
+        2-D grayscale source image.
+
+    H : np.ndarray
+        3 x 3 homography mapping source image coordinates
+        to output image coordinates.
+
+    out_shape : tuple
+        Dimensions of the output image as (height, width).
+
+    Returns
+    -------
+    warped : np.ndarray
+        Warped floating-point image with shape out_shape.
+
+    valid : np.ndarray
+        Boolean mask with shape out_shape indicating which
+        output pixels map to valid source image coordinates.
+    """
+
+    # Convert the input image and homography to NumPy arrays.
+    img = np.asarray(img, dtype=float)
+    H = np.asarray(H, dtype=float)
+
+    # Validate the source image.
+    if img.ndim != 2:
+        raise ValueError("img must be a 2-D grayscale image.")
+
+    # Validate the homography matrix.
+    if H.shape != (3, 3):
+        raise ValueError("H must have shape (3, 3).")
+
+    # Extract the output dimensions.
+    h_out, w_out = out_shape
+
+    if h_out < 0 or w_out < 0:
+        raise ValueError("Output dimensions must be non-negative.")
+
+    # Step 1: Calculate the inverse homography.
+    # H maps source coordinates to output coordinates.
+    # Its inverse maps output coordinates back to source coordinates.
+    H_inv = np.linalg.inv(H)
+
+    # Step 2: Generate coordinates for every output pixel.
+    # y contains row indices and x contains column indices.
+    y, x = np.indices((h_out, w_out))
+
+    # Step 3: Convert the output pixel grid into (x, y) point pairs.
+    output_pts = np.column_stack((
+        x.ravel(),
+        y.ravel()
+    ))
+
+    # Step 4: Map output coordinates back to source coordinates.
+    source_pts = apply_homography(H_inv, output_pts)
+
+    # Reshape the mapped coordinates into the output grid dimensions.
+    source_x = source_pts[:, 0].reshape(h_out, w_out)
+    source_y = source_pts[:, 1].reshape(h_out, w_out)
+
+    # Step 5: Sample the source image using bilinear interpolation.
+    # Invalid source coordinates receive a value of zero.
+    warped, valid = bilinear_sample(
+        img,
+        source_x,
+        source_y
+    )
+
+    # Return the warped image and its Boolean validity mask.
+    return warped, valid
+

@@ -33,6 +33,7 @@ python scaffold.py
 - [x] **21.** ransac_homography
 - [x] **22.** homography_corner_error
 - [x] **23.** bilinear_sample
+- [x] **24.** warp_image
 
 ---
 
