@@ -24,6 +24,7 @@ python scaffold.py
 - [x] **12.** harris_corners
 - [x] **13.** apply_homography
 - [x] **14.** normalize_points
+- [x] **15.** dlt_homography
 
 ---
 

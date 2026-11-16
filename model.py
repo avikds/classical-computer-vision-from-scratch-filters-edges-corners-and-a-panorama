@@ -1069,3 +1069,142 @@ def normalize_points(pts):
 
     return pts_n, T
 
+# Step 15 - dlt_homography
+def dlt_homography(p1, p2, normalize=True):
+    """
+    Estimate a 3 x 3 homography matrix using the Direct Linear Transform (DLT).
+
+    Parameters
+    ----------
+    p1 : np.ndarray
+        Source point coordinates with shape (N, 2).
+
+    p2 : np.ndarray
+        Corresponding destination point coordinates with shape (N, 2).
+
+    normalize : bool, default=True
+        Whether to apply Hartley normalization before constructing
+        the DLT matrix.
+
+    Returns
+    -------
+    np.ndarray
+        Estimated 3 x 3 homography matrix H satisfying:
+
+            p2 ~ H @ p1
+
+        The matrix is normalized so that H[2, 2] = 1.
+
+    Raises
+    ------
+    ValueError
+        If fewer than four correspondences are provided,
+        the point arrays have different lengths, or their shapes
+        are invalid.
+    """
+
+    # Convert both point sets into floating-point NumPy arrays.
+    p1 = np.asarray(p1, dtype=float)
+    p2 = np.asarray(p2, dtype=float)
+
+    # Validate the dimensions of both point arrays.
+    if p1.ndim != 2 or p1.shape[1] != 2:
+        raise ValueError("p1 must have shape (N, 2).")
+
+    if p2.ndim != 2 or p2.shape[1] != 2:
+        raise ValueError("p2 must have shape (N, 2).")
+
+    # Both point sets must contain the same number of correspondences.
+    if len(p1) != len(p2):
+        raise ValueError("p1 and p2 must contain the same number of points.")
+
+    # At least four point correspondences are required to estimate
+    # a homography using the Direct Linear Transform.
+    if len(p1) < 4:
+        raise ValueError("At least four point correspondences are required.")
+
+    # ---------------------------------------------------------
+    # Step 1: Hartley normalization.
+    # ---------------------------------------------------------
+
+    if normalize:
+
+        # Normalize source and destination point sets independently.
+        p1_n, T1 = normalize_points(p1)
+        p2_n, T2 = normalize_points(p2)
+
+    else:
+
+        # Use the original point coordinates without normalization.
+        p1_n = p1
+        p2_n = p2
+
+        # Identity matrices represent the absence of normalization.
+        T1 = np.eye(3, dtype=float)
+        T2 = np.eye(3, dtype=float)
+
+    # ---------------------------------------------------------
+    # Step 2: Construct the DLT matrix A (2N x 9).
+    # ---------------------------------------------------------
+
+    A = []
+
+    for (x, y), (u, v) in zip(p1_n, p2_n):
+
+        # First row corresponds to the transformed x-coordinate.
+        A.append([
+            -x, -y, -1.0,
+             0.0, 0.0, 0.0,
+             u * x, u * y, u
+        ])
+
+        # Second row corresponds to the transformed y-coordinate.
+        A.append([
+             0.0, 0.0, 0.0,
+            -x, -y, -1.0,
+             v * x, v * y, v
+        ])
+
+    # Convert the DLT matrix into a NumPy array.
+    A = np.asarray(A, dtype=float)
+
+    # ---------------------------------------------------------
+    # Step 3: Solve the homogeneous system using SVD.
+    # ---------------------------------------------------------
+
+    # Decompose A into U, S and Vt.
+    #
+    # full_matrices=True is important for exactly four
+    # correspondences because A then has shape (8, 9).
+    # It preserves the ninth right singular vector corresponding
+    # to the null space of A.
+    _, _, Vt = np.linalg.svd(A, full_matrices=True)
+
+    # The right singular vector corresponding to the smallest
+    # singular value gives the homography parameters.
+    h = Vt[-1]
+
+    # Reshape the nine parameters into a 3 x 3 homography matrix.
+    H_normalized = h.reshape(3, 3)
+
+    # ---------------------------------------------------------
+    # Step 4: Denormalize the estimated homography.
+    # ---------------------------------------------------------
+
+    # Convert the normalized homography back to the original
+    # source and destination coordinate systems.
+    #
+    # H = inv(T2) @ H_normalized @ T1
+    H = np.linalg.inv(T2) @ H_normalized @ T1
+
+    # Ensure that the homography can be scaled to H[2, 2] = 1.
+    if not np.isfinite(H[2, 2]) or H[2, 2] == 0.0:
+        raise ValueError(
+            "The estimated homography cannot be normalized to H[2, 2] = 1."
+        )
+
+    # Normalize the homography matrix.
+    H /= H[2, 2]
+
+    return H
+
