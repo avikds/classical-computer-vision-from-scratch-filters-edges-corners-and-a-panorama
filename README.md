@@ -17,6 +17,7 @@ python scaffold.py
 - [x] **5.** non_max_suppression
 - [x] **6.** hysteresis_threshold
 - [x] **7.** canny
+- [x] **8.** structure_tensor
 
 ---
 

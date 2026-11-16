@@ -465,3 +465,52 @@ def canny(img, sigma=1.0, low=0.02, high=0.05):
     # Return the final Boolean edge map.
     return edges
 
+# Step 8 - structure_tensor
+def structure_tensor(img, sigma_d=1.0, sigma_i=2.0):
+    """
+    Compute the three components of the image structure tensor.
+
+    Parameters
+    ----------
+    img : np.ndarray
+        2-D grayscale input image.
+
+    sigma_d : float, default=1.0
+        Gaussian standard deviation used for smoothing the image
+        before computing its gradients (differentiation scale).
+
+    sigma_i : float, default=2.0
+        Gaussian standard deviation used for smoothing the
+        gradient products (integration scale).
+
+    Returns
+    -------
+    Sxx : np.ndarray
+        Smoothed squared horizontal gradient.
+
+    Syy : np.ndarray
+        Smoothed squared vertical gradient.
+
+    Sxy : np.ndarray
+        Smoothed product of horizontal and vertical gradients.
+    """
+
+    # Convert the input image to a floating-point NumPy array.
+    img = np.asarray(img, dtype=float)
+
+    # Step 1: Smooth the image at the differentiation scale.
+    # This reduces noise before calculating image gradients.
+    img_blurred = gaussian_blur(img, sigma_d)
+
+    # Step 2: Compute horizontal and vertical Sobel gradients.
+    gx, gy, _, _ = sobel_gradients(img_blurred)
+
+    # Step 3: Calculate the gradient products and smooth them
+    # at the integration scale.
+    Sxx = gaussian_blur(gx * gx, sigma_i)
+    Syy = gaussian_blur(gy * gy, sigma_i)
+    Sxy = gaussian_blur(gx * gy, sigma_i)
+
+    # Return the three structure tensor components.
+    return Sxx, Syy, Sxy
+
