@@ -192,3 +192,55 @@ def gaussian_blur(img, sigma):
 
     return blurred_img
 
+# Step 4 - sobel_gradients
+def sobel_gradients(img):
+    """
+    Compute image gradients using the normalized Sobel operator.
+
+    Parameters
+    ----------
+    img : np.ndarray
+        2-D grayscale input image.
+
+    Returns
+    -------
+    gx : np.ndarray
+        Horizontal gradient (positive when brightness increases to the right).
+
+    gy : np.ndarray
+        Vertical gradient (positive when brightness increases downward).
+
+    mag : np.ndarray
+        Gradient magnitude.
+
+    theta : np.ndarray
+        Gradient direction in radians, ranging from -pi to pi.
+    """
+
+    # Convert the input image to a floating-point NumPy array.
+    img = np.asarray(img, dtype=float)
+
+    # Define the normalized horizontal Sobel kernel.
+    # The factor 1/8 ensures that a unit-slope ramp produces a gradient of 1.
+    kx = np.array([
+        [1, 0, -1],
+        [2, 0, -2],
+        [1, 0, -1]
+    ], dtype=float) / 8.0
+
+    # The vertical Sobel kernel is the transpose of the horizontal kernel.
+    ky = kx.T
+
+    # Compute horizontal and vertical gradients.
+    # convolve2d uses reflect padding by default and flips the kernels.
+    gx = convolve2d(img, kx)
+    gy = convolve2d(img, ky)
+
+    # Calculate the gradient magnitude.
+    mag = np.sqrt(gx ** 2 + gy ** 2)
+
+    # Calculate the gradient direction in radians.
+    theta = np.arctan2(gy, gx)
+
+    return gx, gy, mag, theta
+
