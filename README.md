@@ -27,6 +27,7 @@ python scaffold.py
 - [x] **15.** dlt_homography
 - [x] **16.** transfer_error
 - [x] **17.** describe_patches
+- [x] **18.** match_descriptors
 
 ---
 

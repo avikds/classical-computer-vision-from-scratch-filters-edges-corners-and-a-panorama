@@ -1413,3 +1413,99 @@ def describe_patches(img, pts, size=8, spacing=2, sigma=None):
 
     return desc, keep
 
+# Step 18 - match_descriptors
+def match_descriptors(d1, d2, ratio=0.8):
+    """
+    Match feature descriptors using Euclidean distance
+    and Lowe's ratio test.
+
+    Parameters
+    ----------
+    d1 : np.ndarray
+        Descriptors from the first image with shape (N1, D).
+
+    d2 : np.ndarray
+        Descriptors from the second image with shape (N2, D).
+        At least two descriptors are required.
+
+    ratio : float, default=0.8
+        Lowe's ratio threshold. A match is accepted only when
+        the nearest-neighbor distance is strictly smaller than
+        ratio multiplied by the second-nearest-neighbor distance.
+
+    Returns
+    -------
+    np.ndarray
+        Integer array of shape (M, 2), where each row contains
+        (i, j), representing a match between d1[i] and d2[j].
+
+        Multiple descriptors from d1 may match the same descriptor
+        in d2. Matches are returned in ascending order of i.
+
+    Raises
+    ------
+    ValueError
+        If d2 contains fewer than two descriptors or the input
+        descriptor arrays have incompatible dimensions.
+    """
+
+    # Convert descriptor inputs to floating-point NumPy arrays.
+    d1 = np.asarray(d1, dtype=float)
+    d2 = np.asarray(d2, dtype=float)
+
+    # Validate that both descriptor arrays are 2-D.
+    if d1.ndim != 2 or d2.ndim != 2:
+        raise ValueError("d1 and d2 must be 2-D descriptor arrays.")
+
+    # At least two descriptors are needed to identify
+    # the nearest and second-nearest neighbors.
+    if d2.shape[0] < 2:
+        raise ValueError("d2 must contain at least two descriptors.")
+
+    # Both descriptor sets must have the same feature dimension.
+    if d1.shape[1] != d2.shape[1]:
+        raise ValueError("d1 and d2 must have the same descriptor dimension.")
+
+    # Store the accepted descriptor correspondences.
+    matches = []
+
+    # Process every descriptor from the first image.
+    for i in range(d1.shape[0]):
+
+        # Calculate Euclidean distances between the current descriptor
+        # and every descriptor in the second image.
+        distances = np.linalg.norm(
+            d2 - d1[i],
+            axis=1
+        )
+
+        # Sort descriptor indices by ascending distance.
+        # Stable sorting ensures that equal-distance ties are resolved
+        # in favor of the smaller index in d2.
+        nearest_indices = np.argsort(
+            distances,
+            kind="stable"
+        )
+
+        # Retrieve the nearest and second-nearest descriptor indices.
+        j1 = nearest_indices[0]
+        j2 = nearest_indices[1]
+
+        # Retrieve their corresponding Euclidean distances.
+        d_best = distances[j1]
+        d_second = distances[j2]
+
+        # Apply Lowe's ratio test.
+        # The strict inequality rejects ambiguous matches.
+        if d_best < ratio * d_second:
+
+            # Store the correspondence as (index in d1, index in d2).
+            matches.append((i, j1))
+
+    # Convert the accepted matches into an integer NumPy array.
+    # Reshape guarantees (0, 2) when no matches are found.
+    return np.asarray(
+        matches,
+        dtype=int
+    ).reshape(-1, 2)
+
