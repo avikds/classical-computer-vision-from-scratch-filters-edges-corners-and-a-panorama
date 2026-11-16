@@ -928,3 +928,66 @@ def harris_corners(img, max_points=500, border=10, sigma_d=1.0, sigma_i=2.0, k=0
 
     return pts
 
+# Step 13 - apply_homography
+def apply_homography(H, pts):
+    """
+    Transform 2-D points using a 3 x 3 homography matrix.
+
+    Parameters
+    ----------
+    H : np.ndarray
+        3 x 3 homography transformation matrix.
+
+    pts : np.ndarray
+        Input points with shape (N, 2), or a single point
+        with shape (2,). Coordinates are in (x, y) order.
+
+    Returns
+    -------
+    np.ndarray
+        Transformed points as a floating-point array
+        with shape (N, 2).
+    """
+
+    # Convert the homography matrix and input points to floating-point arrays.
+    H = np.asarray(H, dtype=float)
+    pts = np.asarray(pts, dtype=float)
+
+    # Validate the homography matrix dimensions.
+    if H.shape != (3, 3):
+        raise ValueError("H must be a 3 x 3 homography matrix.")
+
+    # Accept a single point with shape (2,).
+    # Convert it into a one-row array with shape (1, 2).
+    if pts.ndim == 1:
+        if pts.shape != (2,):
+            raise ValueError("A single point must have shape (2,).")
+        pts = pts.reshape(1, 2)
+
+    # Validate the input point array dimensions.
+    elif pts.ndim != 2 or pts.shape[1] != 2:
+        raise ValueError("pts must have shape (N, 2) or (2,).")
+
+    # Convert Cartesian coordinates (x, y) into homogeneous coordinates
+    # by appending a third coordinate equal to 1.
+    pts_h = np.column_stack((
+        pts,
+        np.ones(pts.shape[0], dtype=float)
+    ))
+
+    # Apply the homography transformation.
+    # Each homogeneous point is represented as a column vector,
+    # so the transformation is equivalent to H @ point.
+    transformed_h = pts_h @ H.T
+
+    # Perform perspective division using the third homogeneous coordinate.
+    # This converts the transformed homogeneous coordinates back
+    # into ordinary 2-D Cartesian coordinates.
+    with np.errstate(divide="ignore", invalid="ignore"):
+        transformed = (
+            transformed_h[:, :2] / transformed_h[:, 2:3]
+        )
+
+    # Return the transformed points as a floating-point array.
+    return transformed.astype(float)
+

@@ -22,6 +22,7 @@ python scaffold.py
 - [x] **10.** local_maxima
 - [x] **11.** refine_subpixel
 - [x] **12.** harris_corners
+- [x] **13.** apply_homography
 
 ---
 
