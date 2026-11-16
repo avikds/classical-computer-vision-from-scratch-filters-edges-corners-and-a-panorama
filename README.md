@@ -19,6 +19,7 @@ python scaffold.py
 - [x] **7.** canny
 - [x] **8.** structure_tensor
 - [x] **9.** corner_response
+- [x] **10.** local_maxima
 
 ---
 

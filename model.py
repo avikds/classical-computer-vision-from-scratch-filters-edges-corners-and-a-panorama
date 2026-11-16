@@ -582,3 +582,131 @@ def corner_response(Sxx, Syy, Sxy, k=0.05, method="harris"):
 
     return np.asarray(response)
 
+# Step 10 - local_maxima
+def local_maxima(R, radius=3, threshold_rel=0.01, max_points=None):
+    """
+    Detect local maxima in a corner response map.
+
+    Parameters
+    ----------
+    R : np.ndarray
+        2-D corner response map.
+
+    radius : int, default=3
+        Radius of the local neighborhood.
+        Each pixel is compared with all values in a
+        (2 * radius + 1) x (2 * radius + 1) window.
+
+    threshold_rel : float, default=0.01
+        Relative threshold. A pixel must have a response
+        strictly greater than threshold_rel * R.max().
+
+    max_points : int, optional
+        Maximum number of strongest local maxima to return.
+        If None, all qualifying maxima are returned.
+
+    Returns
+    -------
+    np.ndarray
+        Float array of shape (N, 2) containing coordinates
+        in (x, y) = (column, row) order.
+
+        Points are sorted by descending response strength.
+        Ties are resolved by ascending row, then ascending column.
+    """
+
+    # Convert the response map into a floating-point NumPy array.
+    R = np.asarray(R, dtype=float)
+
+    # Validate that the response map is two-dimensional.
+    if R.ndim != 2:
+        raise ValueError("R must be a 2-D array.")
+
+    # Validate the neighborhood radius.
+    if not isinstance(radius, (int, np.integer)) or radius < 0:
+        raise ValueError("Radius must be a non-negative integer.")
+
+    # Validate the maximum number of points.
+    if max_points is not None:
+        if not isinstance(max_points, (int, np.integer)) or max_points < 0:
+            raise ValueError("max_points must be a non-negative integer or None.")
+
+    # Return an empty coordinate array if the response map is empty.
+    if R.size == 0:
+        return np.empty((0, 2), dtype=float)
+
+    # Calculate the absolute response threshold.
+    threshold = threshold_rel * np.max(R)
+
+    # Pad the response map with negative infinity.
+    # This ensures that pixels outside the image do not
+    # interfere with local maximum detection.
+    padded = np.pad(
+        R,
+        ((radius, radius), (radius, radius)),
+        mode="constant",
+        constant_values=-np.inf
+    )
+
+    # Get the dimensions of the response map.
+    h, w = R.shape
+
+    # Initialize the local maximum map.
+    local_max = np.full(R.shape, -np.inf, dtype=float)
+
+    # Find the maximum response inside each neighborhood.
+    # Vectorized slicing avoids looping over individual pixels.
+    for dr in range(-radius, radius + 1):
+        for dc in range(-radius, radius + 1):
+
+            # Extract the neighboring response values.
+            neighbor = padded[
+                radius + dr:radius + dr + h,
+                radius + dc:radius + dc + w
+            ]
+
+            # Update the maximum response at every pixel.
+            local_max = np.maximum(local_max, neighbor)
+
+    # A pixel qualifies as a peak when:
+    # 1. Its response is greater than or equal to every
+    #    value in its neighborhood.
+    # 2. Its response is strictly greater than the threshold.
+    #
+    # Using >= allows equal neighboring values to both
+    # qualify as local maxima, as required.
+    peaks = (R >= local_max) & (R > threshold)
+
+    # Obtain peak coordinates in (row, column) order.
+    coordinates = np.argwhere(peaks)
+
+    # Return an empty (0, 2) float array if no peaks are found.
+    if coordinates.size == 0:
+        return np.empty((0, 2), dtype=float)
+
+    # Separate row and column coordinates.
+    rows = coordinates[:, 0]
+    cols = coordinates[:, 1]
+
+    # Retrieve the response strength at each detected peak.
+    values = R[rows, cols]
+
+    # Sort by:
+    # 1. Descending response strength.
+    # 2. Ascending row index.
+    # 3. Ascending column index.
+    #
+    # np.lexsort uses the last supplied key as the primary key.
+    order = np.lexsort((cols, rows, -values))
+
+    # Apply the sorting order.
+    coordinates = coordinates[order]
+
+    # Limit the number of returned points when max_points is specified.
+    if max_points is not None:
+        coordinates = coordinates[:max_points]
+
+    # Convert (row, column) into (x, y) = (column, row).
+    # Return floating-point coordinates as required.
+    return coordinates[:, ::-1].astype(float)
+
