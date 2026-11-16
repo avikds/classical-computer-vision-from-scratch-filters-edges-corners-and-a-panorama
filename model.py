@@ -514,3 +514,71 @@ def structure_tensor(img, sigma_d=1.0, sigma_i=2.0):
     # Return the three structure tensor components.
     return Sxx, Syy, Sxy
 
+# Step 9 - corner_response
+def corner_response(Sxx, Syy, Sxy, k=0.05, method="harris"):
+    """
+    Calculate corner response scores using Harris or Shi-Tomasi methods.
+
+    Parameters
+    ----------
+    Sxx : np.ndarray or float
+        Smoothed squared horizontal gradient.
+
+    Syy : np.ndarray or float
+        Smoothed squared vertical gradient.
+
+    Sxy : np.ndarray or float
+        Smoothed product of horizontal and vertical gradients.
+
+    k : float, default=0.05
+        Empirical sensitivity parameter used by the Harris method.
+
+    method : str, default="harris"
+        Corner detection method:
+        - "harris": Harris corner response.
+        - "shi-tomasi": Smaller eigenvalue of the structure tensor.
+
+    Returns
+    -------
+    np.ndarray
+        Corner response scores with the same shape as the input arrays.
+    """
+
+    # Convert the structure tensor components to floating-point arrays.
+    Sxx = np.asarray(Sxx, dtype=float)
+    Syy = np.asarray(Syy, dtype=float)
+    Sxy = np.asarray(Sxy, dtype=float)
+
+    # Calculate the determinant and trace of the structure tensor.
+    det = Sxx * Syy - Sxy ** 2
+    trace = Sxx + Syy
+
+    # Calculate the corner response using the selected method.
+    if method == "harris":
+
+        # Harris response: determinant - k * (trace)^2.
+        response = det - k * (trace ** 2)
+
+    elif method == "shi-tomasi":
+
+        # Calculate half of the trace.
+        half_trace = trace / 2.0
+
+        # Calculate the discriminant under the square root.
+        # Clip negative values to zero to avoid numerical errors.
+        discriminant = np.maximum(
+            half_trace ** 2 - det,
+            0.0
+        )
+
+        # The smaller eigenvalue is the Shi-Tomasi corner score.
+        response = half_trace - np.sqrt(discriminant)
+
+    else:
+        # Reject unsupported corner detection methods.
+        raise ValueError(
+            "Method must be either 'harris' or 'shi-tomasi'."
+        )
+
+    return np.asarray(response)
+

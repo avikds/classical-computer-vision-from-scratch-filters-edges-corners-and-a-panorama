@@ -18,6 +18,7 @@ python scaffold.py
 - [x] **6.** hysteresis_threshold
 - [x] **7.** canny
 - [x] **8.** structure_tensor
+- [x] **9.** corner_response
 
 ---
 
