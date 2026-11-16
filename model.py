@@ -991,3 +991,81 @@ def apply_homography(H, pts):
     # Return the transformed points as a floating-point array.
     return transformed.astype(float)
 
+# Step 14 - normalize_points
+def normalize_points(pts):
+    """
+    Normalize 2-D points using Hartley's normalization method.
+
+    The transformation translates the centroid of the points
+    to the origin and scales them so that their mean distance
+    from the origin is sqrt(2).
+
+    Parameters
+    ----------
+    pts : np.ndarray
+        Input point coordinates with shape (N, 2).
+        Coordinates are provided in (x, y) order.
+
+    Returns
+    -------
+    pts_n : np.ndarray
+        Normalized points with shape (N, 2).
+
+    T : np.ndarray
+        3 x 3 similarity transformation matrix used
+        to normalize the original points.
+
+    Raises
+    ------
+    ValueError
+        If the input is not a valid (N, 2) array,
+        contains no points, or all points coincide.
+    """
+
+    # Convert input points to a floating-point NumPy array.
+    pts = np.asarray(pts, dtype=float)
+
+    # Validate the input dimensions.
+    if pts.ndim != 2 or pts.shape[1] != 2:
+        raise ValueError("pts must have shape (N, 2).")
+
+    # Ensure that at least one point is provided.
+    if pts.shape[0] == 0:
+        raise ValueError("At least one point is required.")
+
+    # Step 1: Calculate the centroid of the input points.
+    centroid = np.mean(pts, axis=0)
+
+    cx, cy = centroid
+
+    # Step 2: Calculate the Euclidean distance of each point
+    # from the centroid.
+    distances = np.linalg.norm(pts - centroid, axis=1)
+
+    # Calculate the mean distance from the centroid.
+    mean_distance = np.mean(distances)
+
+    # All points coincide when their mean distance is zero.
+    # Normalization is undefined in this case.
+    if mean_distance == 0.0:
+        raise ValueError("All points coincide; normalization is undefined.")
+
+    # Step 3: Calculate the uniform scaling factor.
+    # This makes the mean distance from the origin equal to sqrt(2).
+    scale = np.sqrt(2.0) / mean_distance
+
+    # Step 4: Construct the 3 x 3 similarity transformation matrix.
+    # The matrix first translates the centroid to the origin
+    # and then applies uniform scaling.
+    T = np.array([
+        [scale, 0.0, -scale * cx],
+        [0.0, scale, -scale * cy],
+        [0.0, 0.0, 1.0]
+    ], dtype=float)
+
+    # Step 5: Apply the transformation to the original points.
+    # Reuse apply_homography() implemented in Step 13.
+    pts_n = apply_homography(T, pts)
+
+    return pts_n, T
+

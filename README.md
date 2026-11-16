@@ -23,6 +23,7 @@ python scaffold.py
 - [x] **11.** refine_subpixel
 - [x] **12.** harris_corners
 - [x] **13.** apply_homography
+- [x] **14.** normalize_points
 
 ---
 
