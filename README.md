@@ -28,6 +28,7 @@ python scaffold.py
 - [x] **16.** transfer_error
 - [x] **17.** describe_patches
 - [x] **18.** match_descriptors
+- [x] **19.** corner_repeatability
 
 ---
 

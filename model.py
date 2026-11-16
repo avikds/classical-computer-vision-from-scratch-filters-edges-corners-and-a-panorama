@@ -1509,3 +1509,92 @@ def match_descriptors(d1, d2, ratio=0.8):
         dtype=int
     ).reshape(-1, 2)
 
+# Step 19 - corner_repeatability
+def corner_repeatability(pts1, pts2, H, shape2, tol=1.5):
+    """
+    Measure corner repeatability between two images using
+    the ground-truth homography.
+
+    Parameters
+    ----------
+    pts1 : np.ndarray
+        Corner coordinates from the first image with shape (N1, 2).
+        Coordinates are provided in (x, y) = (column, row) order.
+
+    pts2 : np.ndarray
+        Corner coordinates from the second image with shape (N2, 2).
+
+    H : np.ndarray
+        3 x 3 homography mapping points from image 1 to image 2.
+
+    shape2 : tuple
+        Shape of the second image as (height, width).
+
+    tol : float, default=1.5
+        Maximum Euclidean distance in pixels for considering
+        a transformed corner to have a match.
+
+    Returns
+    -------
+    float
+        Fraction of transformed corners inside image 2 that have
+        at least one corresponding corner within the specified
+        tolerance. Returns 0.0 if there are no valid points to score.
+    """
+
+    # Convert corner coordinates into floating-point NumPy arrays.
+    pts1 = np.asarray(pts1, dtype=float)
+    pts2 = np.asarray(pts2, dtype=float)
+
+    # Validate the input point arrays.
+    if pts1.ndim != 2 or pts1.shape[1] != 2:
+        raise ValueError("pts1 must have shape (N, 2).")
+
+    if pts2.ndim != 2 or pts2.shape[1] != 2:
+        raise ValueError("pts2 must have shape (N, 2).")
+
+    # Extract the height and width of the second image.
+    h2, w2 = shape2
+
+    # An empty destination corner set cannot produce any matches.
+    if len(pts2) == 0:
+        return 0.0
+
+    # Step 1: Transform the corners from image 1 into image 2
+    # using the provided ground-truth homography.
+    mapped_pts = apply_homography(H, pts1)
+
+    # Step 2: Keep only transformed points that fall inside image 2.
+    # Both coordinate boundaries are inclusive.
+    inside = (
+        (mapped_pts[:, 0] >= 0) &
+        (mapped_pts[:, 0] <= w2 - 1) &
+        (mapped_pts[:, 1] >= 0) &
+        (mapped_pts[:, 1] <= h2 - 1)
+    )
+
+    # Extract only the transformed points that are inside image 2.
+    valid_pts = mapped_pts[inside]
+
+    # Return 0.0 if no transformed corner lies inside image 2.
+    if len(valid_pts) == 0:
+        return 0.0
+
+    # Step 3: Calculate pairwise Euclidean distances between
+    # valid transformed corners and corners detected in image 2.
+    #
+    # Broadcasting produces an array of shape (N_valid, N2, 2).
+    differences = valid_pts[:, None, :] - pts2[None, :, :]
+
+    # Calculate Euclidean distances for every point pair.
+    distances = np.linalg.norm(differences, axis=2)
+
+    # A transformed corner is repeatable if at least one
+    # corner in image 2 is within the specified tolerance.
+    matched = np.any(distances <= tol, axis=1)
+
+    # Calculate the fraction of repeatable corners.
+    repeatability = np.mean(matched)
+
+    return float(repeatability)
+
