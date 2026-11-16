@@ -2099,3 +2099,125 @@ def warp_image(img, H, out_shape):
     # Return the warped image and its Boolean validity mask.
     return warped, valid
 
+# Step 25 - panorama_canvas
+def panorama_canvas(shape1, shape2, H):
+    """
+    Calculate the output canvas required to contain two images
+    aligned using a homography.
+
+    Parameters
+    ----------
+    shape1 : tuple
+        Dimensions of the first image as (height, width).
+
+    shape2 : tuple
+        Dimensions of the second image as (height, width).
+
+    H : np.ndarray
+        3 x 3 homography mapping image 1 coordinates
+        to image 2 coordinates.
+
+    Returns
+    -------
+    T : np.ndarray
+        3 x 3 translation matrix that moves the minimum
+        canvas coordinates to the origin.
+
+    out_shape : tuple
+        Output canvas dimensions as (height, width).
+        Both dimensions are Python integers.
+    """
+
+    # Extract the dimensions of both images.
+    h1, w1 = shape1
+    h2, w2 = shape2
+
+    # Validate image dimensions.
+    if h1 < 1 or w1 < 1 or h2 < 1 or w2 < 1:
+        raise ValueError("Image dimensions must be positive.")
+
+    # Convert the homography into a floating-point NumPy array.
+    H = np.asarray(H, dtype=float)
+
+    # Validate the homography matrix.
+    if H.shape != (3, 3):
+        raise ValueError("H must have shape (3, 3).")
+
+    # ---------------------------------------------------------
+    # Step 1: Define the four corners of image 1.
+    # ---------------------------------------------------------
+
+    # Coordinates follow the (x, y) = (column, row) convention.
+    corners1 = np.array([
+        [0.0, 0.0],
+        [w1 - 1.0, 0.0],
+        [w1 - 1.0, h1 - 1.0],
+        [0.0, h1 - 1.0]
+    ], dtype=float)
+
+    # ---------------------------------------------------------
+    # Step 2: Define the four corners of image 2.
+    # ---------------------------------------------------------
+
+    corners2 = np.array([
+        [0.0, 0.0],
+        [w2 - 1.0, 0.0],
+        [w2 - 1.0, h2 - 1.0],
+        [0.0, h2 - 1.0]
+    ], dtype=float)
+
+    # ---------------------------------------------------------
+    # Step 3: Map image 2 corners back into image 1 coordinates.
+    # ---------------------------------------------------------
+
+    # H maps image 1 to image 2.
+    # Therefore, H inverse maps image 2 to image 1.
+    H_inv = np.linalg.inv(H)
+
+    mapped_corners2 = apply_homography(
+        H_inv,
+        corners2
+    )
+
+    # ---------------------------------------------------------
+    # Step 4: Combine both sets of corners.
+    # ---------------------------------------------------------
+
+    all_corners = np.vstack((
+        corners1,
+        mapped_corners2
+    ))
+
+    # Calculate the minimum and maximum coordinates.
+    # floor() ensures the lower boundary covers every point.
+    # ceil() ensures the upper boundary covers every point.
+    lo = np.floor(np.min(all_corners, axis=0))
+    hi = np.ceil(np.max(all_corners, axis=0))
+
+    # Extract the minimum and maximum x and y coordinates.
+    lo_x, lo_y = lo
+    hi_x, hi_y = hi
+
+    # ---------------------------------------------------------
+    # Step 5: Construct the translation matrix.
+    # ---------------------------------------------------------
+
+    # Translate the minimum x and y coordinates to the origin.
+    T = np.array([
+        [1.0, 0.0, -lo_x],
+        [0.0, 1.0, -lo_y],
+        [0.0, 0.0, 1.0]
+    ], dtype=float)
+
+    # ---------------------------------------------------------
+    # Step 6: Calculate the output canvas dimensions.
+    # ---------------------------------------------------------
+
+    # Add one because both boundary coordinates are included.
+    out_shape = (
+        int(hi_y - lo_y + 1),
+        int(hi_x - lo_x + 1)
+    )
+
+    return T, out_shape
+

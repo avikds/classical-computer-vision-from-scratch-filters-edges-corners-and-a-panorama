@@ -34,6 +34,7 @@ python scaffold.py
 - [x] **22.** homography_corner_error
 - [x] **23.** bilinear_sample
 - [x] **24.** warp_image
+- [x] **25.** panorama_canvas
 
 ---
 
