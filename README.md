@@ -37,6 +37,7 @@ python scaffold.py
 - [x] **25.** panorama_canvas
 - [x] **26.** feather_weights
 - [x] **27.** match_exposure
+- [x] **28.** stitch_panorama
 
 ---
 

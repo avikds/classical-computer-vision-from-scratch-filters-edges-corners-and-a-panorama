@@ -2351,3 +2351,306 @@ def match_exposure(ref, img, mask):
 
     return gain, offset
 
+# Step 28 - stitch_panorama
+def stitch_panorama(img1, img2, blend="feather", compensate=True,
+                    ratio=0.8, thresh=1.0, rng=None):
+    """
+    Stitch two overlapping grayscale images into a single panorama.
+
+    The pipeline detects Harris corners, describes local patches,
+    matches feature descriptors, estimates a robust homography using
+    RANSAC, warps both images onto a shared canvas, optionally
+    compensates for exposure differences, and blends the results.
+
+    Parameters
+    ----------
+    img1 : np.ndarray
+        First 2-D grayscale image. The panorama is constructed
+        in the coordinate frame of this image.
+
+    img2 : np.ndarray
+        Second 2-D grayscale image overlapping the first image.
+
+    blend : str, default="feather"
+        Blending method:
+        - "overwrite": Use image 1 wherever it is valid;
+                       otherwise use image 2.
+        - "average":   Average the valid image intensities.
+        - "feather":   Blend using spatial feather weights.
+
+    compensate : bool, default=True
+        Whether to estimate and correct exposure differences
+        in the overlapping region.
+
+    ratio : float, default=0.8
+        Lowe's ratio threshold used for descriptor matching.
+
+    thresh : float, default=1.0
+        RANSAC transfer-error threshold in pixels.
+
+    rng : np.random.Generator, optional
+        Random number generator used by RANSAC.
+        If None, a default generator is created by RANSAC.
+
+    Returns
+    -------
+    dict
+        Dictionary containing:
+
+        panorama : np.ndarray
+            Final blended panorama.
+
+        valid : np.ndarray
+            Boolean mask indicating pixels covered by either image.
+
+        overlap : np.ndarray
+            Boolean mask indicating pixels covered by both images.
+
+        H : np.ndarray
+            Estimated homography mapping image 1 to image 2.
+
+        T : np.ndarray
+            Translation matrix mapping image 1 coordinates
+            onto the panorama canvas.
+
+        gain : float
+            Estimated exposure gain applied to image 2.
+
+        offset : float
+            Estimated exposure offset applied to image 2.
+
+        n_matches : int
+            Number of descriptor matches.
+
+        n_inliers : int
+            Number of RANSAC inlier correspondences.
+
+    Raises
+    ------
+    ValueError
+        If an unsupported blending method is provided or
+        the required feature correspondences cannot be obtained.
+    """
+
+    # Validate the requested blending method.
+    if blend not in ("overwrite", "average", "feather"):
+        raise ValueError(
+            "blend must be 'overwrite', 'average', or 'feather'."
+        )
+
+    # Convert both input images to floating-point NumPy arrays.
+    img1 = np.asarray(img1, dtype=float)
+    img2 = np.asarray(img2, dtype=float)
+
+    # ---------------------------------------------------------
+    # Step 1: Detect Harris corners in both images.
+    # ---------------------------------------------------------
+
+    pts1 = harris_corners(img1)
+    pts2 = harris_corners(img2)
+
+    # ---------------------------------------------------------
+    # Step 2: Generate normalized patch descriptors.
+    # ---------------------------------------------------------
+
+    d1, keep1 = describe_patches(img1, pts1)
+    d2, keep2 = describe_patches(img2, pts2)
+
+    # Retain only corner coordinates whose descriptors were valid.
+    q1 = pts1[keep1]
+    q2 = pts2[keep2]
+
+    # ---------------------------------------------------------
+    # Step 3: Match descriptors using Lowe's ratio test.
+    # ---------------------------------------------------------
+
+    matches = match_descriptors(
+        d1,
+        d2,
+        ratio=ratio
+    )
+
+    # Extract matched point coordinates from both images.
+    matched_p1 = q1[matches[:, 0]]
+    matched_p2 = q2[matches[:, 1]]
+
+    # Record the total number of descriptor matches.
+    n_matches = int(len(matches))
+
+    # ---------------------------------------------------------
+    # Step 4: Estimate the homography using RANSAC.
+    # ---------------------------------------------------------
+
+    # The estimated homography maps image 1 coordinates to image 2.
+    H, inliers, trials = ransac_homography(
+        matched_p1,
+        matched_p2,
+        thresh=thresh,
+        rng=rng
+    )
+
+    # Record the number of reliable correspondences.
+    n_inliers = int(np.sum(inliers))
+
+    # ---------------------------------------------------------
+    # Step 5: Calculate the panorama canvas.
+    # ---------------------------------------------------------
+
+    # Determine the translation matrix and output canvas dimensions.
+    T, out_shape = panorama_canvas(
+        img1.shape,
+        img2.shape,
+        H
+    )
+
+    # Image 1 is mapped onto the canvas using T.
+    #
+    # Image 2 is first mapped into image 1's coordinate frame
+    # using the inverse homography, and then translated onto the canvas.
+    H2 = T @ np.linalg.inv(H)
+
+    # ---------------------------------------------------------
+    # Step 6: Warp both images onto the common canvas.
+    # ---------------------------------------------------------
+
+    a, va = warp_image(
+        img1,
+        T,
+        out_shape
+    )
+
+    b, vb = warp_image(
+        img2,
+        H2,
+        out_shape
+    )
+
+    # Identify the region covered by both warped images.
+    overlap = va & vb
+
+    # ---------------------------------------------------------
+    # Step 7: Match the exposure of image 2 to image 1.
+    # ---------------------------------------------------------
+
+    if compensate:
+
+        # Estimate the gain and offset using only overlapping pixels.
+        gain, offset = match_exposure(
+            a,
+            b,
+            overlap
+        )
+
+    else:
+        # Leave image 2's exposure unchanged.
+        gain = 1.0
+        offset = 0.0
+
+    # Apply the exposure correction only where image 2 is valid.
+    # Invalid pixels must remain zero.
+    b = np.where(
+        vb,
+        gain * b + offset,
+        0.0
+    )
+
+    # ---------------------------------------------------------
+    # Step 8: Blend the two warped images.
+    # ---------------------------------------------------------
+
+    if blend == "overwrite":
+
+        # Prefer image 1 wherever it is valid.
+        # Use image 2 only where image 1 is unavailable.
+        panorama = np.where(
+            va,
+            a,
+            b
+        )
+
+    elif blend == "average":
+
+        # Use binary weights based on the validity masks.
+        wa = va.astype(float)
+        wb = vb.astype(float)
+
+        # Calculate the total contribution weight.
+        total_weight = wa + wb
+
+        # Calculate the weighted sum of image intensities.
+        weighted_sum = wa * a + wb * b
+
+        # Divide by the total weight wherever it is positive.
+        # Pixels not covered by either image remain zero.
+        panorama = np.divide(
+            weighted_sum,
+            total_weight,
+            out=np.zeros_like(weighted_sum),
+            where=total_weight > 0
+        )
+
+    elif blend == "feather":
+
+        # Generate feather weight maps in the original image grids.
+        weights1 = feather_weights(img1.shape)
+        weights2 = feather_weights(img2.shape)
+
+        # Warp both weight maps onto the same panorama canvas.
+        # Use the same transformations as the corresponding images.
+        wa, _ = warp_image(
+            weights1,
+            T,
+            out_shape
+        )
+
+        wb, _ = warp_image(
+            weights2,
+            H2,
+            out_shape
+        )
+
+        # Exclude invalid pixels from each image's contribution.
+        wa = wa * va
+        wb = wb * vb
+
+        # Calculate the total feather weight.
+        total_weight = wa + wb
+
+        # Calculate the weighted sum of image intensities.
+        weighted_sum = wa * a + wb * b
+
+        # Perform weighted feather blending.
+        # Avoid division by zero outside both images.
+        panorama = np.divide(
+            weighted_sum,
+            total_weight,
+            out=np.zeros_like(weighted_sum),
+            where=total_weight > 0
+        )
+
+    # ---------------------------------------------------------
+    # Step 9: Construct the output validity masks.
+    # ---------------------------------------------------------
+
+    # A pixel is valid if at least one warped image covers it.
+    valid = va | vb
+
+    # A pixel belongs to the overlap if both images cover it.
+    overlap = va & vb
+
+    # ---------------------------------------------------------
+    # Step 10: Return the complete panorama result.
+    # ---------------------------------------------------------
+
+    return {
+        "panorama": panorama,
+        "valid": valid,
+        "overlap": overlap,
+        "H": H,
+        "T": T,
+        "gain": float(gain),
+        "offset": float(offset),
+        "n_matches": n_matches,
+        "n_inliers": n_inliers
+    }
+
