@@ -30,6 +30,7 @@ python scaffold.py
 - [x] **18.** match_descriptors
 - [x] **19.** corner_repeatability
 - [x] **20.** ransac_num_iterations
+- [x] **21.** ransac_homography
 
 ---
 

@@ -1661,3 +1661,207 @@ def ransac_num_iterations(p, w, s):
 
     return iterations
 
+# Step 21 - ransac_homography
+def ransac_homography(p1, p2, thresh=1.0, max_iters=2000, p=0.99, rng=None):
+    """
+    Estimate a robust homography using Random Sample Consensus (RANSAC).
+
+    Parameters
+    ----------
+    p1 : np.ndarray
+        Source points with shape (N, 2).
+
+    p2 : np.ndarray
+        Corresponding destination points with shape (N, 2).
+
+    thresh : float, default=1.0
+        Maximum transfer error in pixels for a correspondence
+        to be considered an inlier.
+
+    max_iters : int, default=2000
+        Maximum number of random samples to draw.
+
+    p : float, default=0.99
+        Desired confidence for finding an all-inlier sample.
+
+    rng : np.random.Generator, optional
+        Random number generator used for reproducible sampling.
+        If None, a new default NumPy generator is created.
+
+    Returns
+    -------
+    H : np.ndarray
+        Estimated 3 x 3 homography matrix, normalized so that H[2, 2] = 1.
+
+    inliers : np.ndarray
+        Boolean array of shape (N,) indicating the final inlier correspondences.
+
+    trials : int
+        Number of random samples drawn.
+
+    Raises
+    ------
+    ValueError
+        If fewer than four correspondences are provided or a valid
+        homography cannot be estimated from the available inliers.
+    """
+
+    # Convert both point sets into floating-point NumPy arrays.
+    p1 = np.asarray(p1, dtype=float)
+    p2 = np.asarray(p2, dtype=float)
+
+    # Validate the dimensions of the input point arrays.
+    if p1.ndim != 2 or p1.shape[1] != 2:
+        raise ValueError("p1 must have shape (N, 2).")
+
+    if p2.ndim != 2 or p2.shape[1] != 2:
+        raise ValueError("p2 must have shape (N, 2).")
+
+    # Ensure both point sets contain the same number of correspondences.
+    if len(p1) != len(p2):
+        raise ValueError("p1 and p2 must have the same number of points.")
+
+    # At least four correspondences are required to estimate a homography.
+    N = len(p1)
+
+    if N < 4:
+        raise ValueError("At least four correspondences are required.")
+
+    # Create a random number generator if one was not supplied.
+    if rng is None:
+        rng = np.random.default_rng()
+
+    # Initialize the best consensus set.
+    best_inliers = None
+    best_count = 0
+
+    # Initialize the adaptive RANSAC iteration budget.
+    need = max_iters
+
+    # Count the number of random samples drawn.
+    trials = 0
+
+    # ---------------------------------------------------------
+    # Step 1: RANSAC random sampling and consensus evaluation.
+    # ---------------------------------------------------------
+
+    while trials < min(need, max_iters):
+
+        # Count the current trial.
+        trials += 1
+
+        # Randomly select four distinct correspondence indices.
+        sample_indices = rng.choice(
+            N,
+            4,
+            replace=False
+        )
+
+        # Extract the corresponding four source and destination points.
+        sample_p1 = p1[sample_indices]
+        sample_p2 = p2[sample_indices]
+
+        # Estimate a candidate homography using normalized DLT.
+        try:
+            H_candidate = dlt_homography(
+                sample_p1,
+                sample_p2
+            )
+
+        # Skip degenerate samples or failed numerical decompositions.
+        except (ValueError, np.linalg.LinAlgError):
+            continue
+
+        # Reject candidate homographies containing non-finite values.
+        if not np.all(np.isfinite(H_candidate)):
+            continue
+
+        # -----------------------------------------------------
+        # Step 2: Identify the inliers of the candidate model.
+        # -----------------------------------------------------
+
+        # Calculate the transfer error for every correspondence.
+        errors = transfer_error(
+            H_candidate,
+            p1,
+            p2
+        )
+
+        # A correspondence is an inlier only when its transfer
+        # error is strictly smaller than the specified threshold.
+        inliers = errors < thresh
+
+        # Count the inliers in the current consensus set.
+        inlier_count = int(np.sum(inliers))
+
+        # -----------------------------------------------------
+        # Step 3: Update the best model and adaptive iteration budget.
+        # -----------------------------------------------------
+
+        # Keep the current model only when it contains strictly
+        # more inliers than the best model found so far.
+        if inlier_count > best_count:
+
+            # Save the new best consensus set.
+            best_count = inlier_count
+            best_inliers = inliers.copy()
+
+            # Calculate the updated number of iterations required
+            # to achieve the desired confidence using the current
+            # estimated inlier fraction and four-point samples.
+            need = ransac_num_iterations(
+                p,
+                best_count / N,
+                4
+            )
+
+    # ---------------------------------------------------------
+    # Step 4: Validate the best consensus set.
+    # ---------------------------------------------------------
+
+    # At least four inliers are needed for the final homography.
+    if best_inliers is None or best_count < 4:
+        raise ValueError(
+            "RANSAC could not find a valid consensus with at least four inliers."
+        )
+
+    # ---------------------------------------------------------
+    # Step 5: First refinement using all best inliers.
+    # ---------------------------------------------------------
+
+    # Re-estimate the homography using the entire best consensus set.
+    H = dlt_homography(
+        p1[best_inliers],
+        p2[best_inliers]
+    )
+
+    # Recalculate the inlier mask using the refined homography.
+    inliers = transfer_error(
+        H,
+        p1,
+        p2
+    ) < thresh
+
+    # ---------------------------------------------------------
+    # Step 6: Second refinement using the updated inlier set.
+    # ---------------------------------------------------------
+
+    # Perform one more refinement if at least four inliers remain.
+    if np.sum(inliers) >= 4:
+
+        # Estimate the homography again using the updated inliers.
+        H = dlt_homography(
+            p1[inliers],
+            p2[inliers]
+        )
+
+        # Recompute the final inlier mask with the second refinement.
+        inliers = transfer_error(
+            H,
+            p1,
+            p2
+        ) < thresh
+
+    # Return the final homography, Boolean inlier mask, and trial count.
+    return H, inliers, trials
+
