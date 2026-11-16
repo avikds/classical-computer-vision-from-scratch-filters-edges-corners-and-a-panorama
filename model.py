@@ -1208,3 +1208,50 @@ def dlt_homography(p1, p2, normalize=True):
 
     return H
 
+# Step 16 - transfer_error
+def transfer_error(H, p1, p2):
+    """
+    Calculate the homography transfer error for corresponding points.
+
+    Parameters
+    ----------
+    H : np.ndarray
+        3 x 3 homography transformation matrix.
+
+    p1 : np.ndarray
+        Source points with shape (N, 2).
+
+    p2 : np.ndarray
+        Corresponding destination points with shape (N, 2).
+
+    Returns
+    -------
+    np.ndarray
+        Floating-point array of shape (N,) containing the
+        Euclidean transfer error for each correspondence.
+    """
+
+    # Convert point coordinates to floating-point NumPy arrays.
+    p1 = np.asarray(p1, dtype=float)
+    p2 = np.asarray(p2, dtype=float)
+
+    # Validate that both point arrays have shape (N, 2).
+    if p1.ndim != 2 or p1.shape[1] != 2:
+        raise ValueError("p1 must have shape (N, 2).")
+
+    if p2.ndim != 2 or p2.shape[1] != 2:
+        raise ValueError("p2 must have shape (N, 2).")
+
+    # Ensure that both point arrays contain the same number of points.
+    if p1.shape[0] != p2.shape[0]:
+        raise ValueError("p1 and p2 must contain the same number of points.")
+
+    # Transform source points into the destination coordinate system.
+    mapped_points = apply_homography(H, p1)
+
+    # Calculate the Euclidean distance between transformed points
+    # and their corresponding destination points.
+    errors = np.linalg.norm(mapped_points - p2, axis=1)
+
+    return errors.astype(float)
+
