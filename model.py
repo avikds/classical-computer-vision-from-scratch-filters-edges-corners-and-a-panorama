@@ -835,3 +835,96 @@ def refine_subpixel(R, pts):
 
     return refined.astype(float)
 
+# Step 12 - harris_corners
+def harris_corners(img, max_points=500, border=10, sigma_d=1.0, sigma_i=2.0, k=0.05, radius=3,
+                   threshold_rel=0.001, method="harris", subpixel=True):
+    """
+    Detect corners using the Harris or Shi-Tomasi corner detection method.
+
+    Parameters
+    ----------
+    img : np.ndarray
+        2-D grayscale input image.
+
+    max_points : int, default=500
+        Maximum number of strongest corners to return.
+
+    border : int, default=10
+        Number of pixels excluded along each image boundary.
+
+    sigma_d : float, default=1.0
+        Gaussian standard deviation for the differentiation scale.
+
+    sigma_i : float, default=2.0
+        Gaussian standard deviation for the integration scale.
+
+    k : float, default=0.05
+        Harris detector sensitivity parameter.
+
+    radius : int, default=3
+        Neighborhood radius for local maximum detection.
+
+    threshold_rel : float, default=0.001
+        Relative threshold for selecting corner responses.
+
+    method : str, default="harris"
+        Corner detection method: "harris" or "shi-tomasi".
+
+    subpixel : bool, default=True
+        Whether to refine detected corner coordinates to sub-pixel accuracy.
+
+    Returns
+    -------
+    np.ndarray
+        Floating-point array of shape (N, 2) containing corner coordinates
+        in (x, y) = (column, row) order, strongest first.
+    """
+
+    # Convert the input image to a floating-point NumPy array.
+    img = np.asarray(img, dtype=float)
+
+    # Step 1: Compute the structure tensor at the specified scales.
+    Sxx, Syy, Sxy = structure_tensor(
+        img,
+        sigma_d=sigma_d,
+        sigma_i=sigma_i
+    )
+
+    # Step 2: Calculate the corner response using the selected method.
+    R = corner_response(
+        Sxx,
+        Syy,
+        Sxy,
+        k=k,
+        method=method
+    )
+
+    # Step 3: Create a copy of the response map for border masking.
+    # The original response R is preserved for sub-pixel refinement.
+    R_masked = R.copy()
+
+    # Replace the boundary regions with the minimum response value.
+    # This prevents unwanted corner detections near image edges.
+    if border > 0:
+        min_response = R.min()
+
+        R_masked[:border, :] = min_response
+        R_masked[-border:, :] = min_response
+        R_masked[:, :border] = min_response
+        R_masked[:, -border:] = min_response
+
+    # Step 4: Detect local maxima and select the strongest candidates.
+    pts = local_maxima(
+        R_masked,
+        radius=radius,
+        threshold_rel=threshold_rel,
+        max_points=max_points
+    )
+
+    # Step 5: Optionally refine the detected corners to sub-pixel accuracy.
+    # Use the original, unmasked response map for accurate interpolation.
+    if subpixel:
+        pts = refine_subpixel(R, pts)
+
+    return pts
+

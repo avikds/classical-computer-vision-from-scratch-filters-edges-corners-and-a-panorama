@@ -21,6 +21,7 @@ python scaffold.py
 - [x] **9.** corner_response
 - [x] **10.** local_maxima
 - [x] **11.** refine_subpixel
+- [x] **12.** harris_corners
 
 ---
 
