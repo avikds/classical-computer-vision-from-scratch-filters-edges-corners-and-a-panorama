@@ -710,3 +710,128 @@ def local_maxima(R, radius=3, threshold_rel=0.01, max_points=None):
     # Return floating-point coordinates as required.
     return coordinates[:, ::-1].astype(float)
 
+# Step 11 - refine_subpixel
+def refine_subpixel(R, pts):
+    """
+    Refine integer corner coordinates to sub-pixel accuracy
+    using independent parabolic interpolation along x and y.
+
+    Parameters
+    ----------
+    R : np.ndarray
+        2-D corner response map.
+
+    pts : np.ndarray
+        Array of corner coordinates with shape (N, 2).
+        Coordinates are provided in (x, y) = (column, row) order.
+
+    Returns
+    -------
+    np.ndarray
+        New floating-point array of shape (N, 2) containing
+        the refined sub-pixel corner coordinates.
+    """
+
+    # Convert the response map and corner coordinates to floating-point arrays.
+    R = np.asarray(R, dtype=float)
+    pts = np.asarray(pts, dtype=float)
+
+    # Validate the response map.
+    if R.ndim != 2:
+        raise ValueError("R must be a 2-D array.")
+
+    # Handle an empty set of corner coordinates.
+    if pts.size == 0:
+        return np.empty((0, 2), dtype=float)
+
+    # Validate the corner coordinate dimensions.
+    if pts.ndim != 2 or pts.shape[1] != 2:
+        raise ValueError("pts must have shape (N, 2).")
+
+    # Create a new array so that the original points are not modified.
+    refined = pts.copy()
+
+    # Get the dimensions of the response map.
+    h, w = R.shape
+
+    # Refine each detected corner independently.
+    for i, (x, y) in enumerate(pts):
+
+        # Convert the input coordinates to their nearest integer pixels.
+        xi = int(np.rint(x))
+        yi = int(np.rint(y))
+
+        # Start with the integer pixel coordinates.
+        refined[i, 0] = xi
+        refined[i, 1] = yi
+
+        # Skip refinement if the rounded center is outside the image.
+        if not (0 <= xi < w and 0 <= yi < h):
+            continue
+
+        # ---------------------------------------------------------
+        # Horizontal sub-pixel refinement (x direction).
+        # ---------------------------------------------------------
+
+        # A valid horizontal neighborhood requires the center pixel
+        # to have one neighbor on both its left and right.
+        if 0 < xi < w - 1:
+
+            # Get the three response values along the horizontal direction.
+            a = R[yi, xi - 1]
+            c = R[yi, xi]
+            b = R[yi, xi + 1]
+
+            # Calculate the second difference of the parabola.
+            denominator = a - 2.0 * c + b
+
+            # Refine only when the center is a local maximum
+            # and the fitted parabola is concave.
+            if (
+                np.isfinite(a) and
+                np.isfinite(c) and
+                np.isfinite(b) and
+                c >= a and
+                c >= b and
+                denominator < 0
+            ):
+                # Calculate the horizontal displacement to the vertex.
+                dx = 0.5 * (a - b) / denominator
+
+                # Update the horizontal coordinate.
+                refined[i, 0] = xi + dx
+
+        # ---------------------------------------------------------
+        # Vertical sub-pixel refinement (y direction).
+        # ---------------------------------------------------------
+
+        # A valid vertical neighborhood requires the center pixel
+        # to have one neighbor above and one below.
+        if 0 < yi < h - 1:
+
+            # Get the three response values along the vertical direction.
+            a = R[yi - 1, xi]
+            c = R[yi, xi]
+            b = R[yi + 1, xi]
+
+            # Calculate the second difference of the parabola.
+            denominator = a - 2.0 * c + b
+
+            # Refine only when the center is a local maximum
+            # and the fitted parabola is concave.
+            if (
+                np.isfinite(a) and
+                np.isfinite(c) and
+                np.isfinite(b) and
+                c >= a and
+                c >= b and
+                denominator < 0
+            ):
+                # Calculate the vertical displacement to the vertex.
+                dy = 0.5 * (a - b) / denominator
+
+                # Update the vertical coordinate.
+                refined[i, 1] = yi + dy
+
+    return refined.astype(float)
+

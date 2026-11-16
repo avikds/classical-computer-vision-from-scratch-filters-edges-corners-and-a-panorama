@@ -20,6 +20,7 @@ python scaffold.py
 - [x] **8.** structure_tensor
 - [x] **9.** corner_response
 - [x] **10.** local_maxima
+- [x] **11.** refine_subpixel
 
 ---
 
