@@ -244,3 +244,101 @@ def sobel_gradients(img):
 
     return gx, gy, mag, theta
 
+# Step 5 - non_max_suppression
+def non_max_suppression(mag, theta):
+    """
+    Apply Non-Maximum Suppression to thin gradient magnitudes
+    into approximately one-pixel-wide edges.
+
+    Parameters
+    ----------
+    mag : np.ndarray
+        2-D gradient magnitude array.
+
+    theta : np.ndarray
+        2-D gradient direction array in radians.
+
+    Returns
+    -------
+    np.ndarray
+        Gradient magnitude array containing only local maxima
+        along their quantized gradient directions. Other pixels
+        are set to zero.
+    """
+
+    # Convert inputs to floating-point NumPy arrays.
+    mag = np.asarray(mag, dtype=float)
+    theta = np.asarray(theta, dtype=float)
+
+    # Validate input dimensions.
+    if mag.ndim != 2 or theta.ndim != 2:
+        raise ValueError("mag and theta must be 2-D arrays.")
+
+    # Ensure both arrays have identical dimensions.
+    if mag.shape != theta.shape:
+        raise ValueError("mag and theta must have the same shape.")
+
+    h, w = mag.shape
+
+    # Convert gradient directions from radians to degrees.
+    # Modulo 180 makes opposite gradient directions equivalent.
+    angle = np.mod(np.rad2deg(theta), 180.0)
+
+    # Quantize each gradient direction into one of four bins:
+    # 0, 45, 90, or 135 degrees.
+    bins = np.floor((angle + 22.5) / 45.0).astype(int) % 4
+
+    # Define the neighbor direction (dr, dc) for each bin.
+    # These directions point toward the neighbor ahead.
+    directions = (
+        (0, 1),    # 0 degrees
+        (1, 1),    # 45 degrees
+        (1, 0),    # 90 degrees
+        (1, -1)    # 135 degrees
+    )
+
+    # Pad the magnitude array with zeros.
+    # This ensures that out-of-image neighbors contribute zero.
+    padded = np.pad(
+        mag,
+        ((1, 1), (1, 1)),
+        mode="constant",
+        constant_values=0
+    )
+
+    # Initialize the output array with zeros.
+    suppressed = np.zeros_like(mag, dtype=float)
+
+    # Process each quantized gradient direction separately.
+    for bin_index, (dr, dc) in enumerate(directions):
+
+        # Extract the neighbor behind each pixel (p - d).
+        behind = padded[
+            1 - dr:1 - dr + h,
+            1 - dc:1 - dc + w
+        ]
+
+        # Extract the neighbor ahead of each pixel (p + d).
+        ahead = padded[
+            1 + dr:1 + dr + h,
+            1 + dc:1 + dc + w
+        ]
+
+        # Keep pixels that:
+        # 1. Belong to the current direction bin.
+        # 2. Are greater than or equal to the neighbor behind.
+        # 3. Are strictly greater than the neighbor ahead.
+        #
+        # The asymmetric comparison ensures deterministic
+        # tie-breaking when two neighboring pixels have equal values.
+        keep = (
+            (bins == bin_index) &
+            (mag >= behind) &
+            (mag > ahead)
+        )
+
+        # Preserve the original magnitude at selected pixels.
+        suppressed[keep] = mag[keep]
+
+    return suppressed
+

@@ -14,6 +14,7 @@ python scaffold.py
 - [x] **2.** gaussian_kernel1d
 - [x] **3.** gaussian_blur
 - [x] **4.** sobel_gradients
+- [x] **5.** non_max_suppression
 
 ---
 
