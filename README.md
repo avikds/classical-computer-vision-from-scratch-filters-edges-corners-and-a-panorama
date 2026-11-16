@@ -11,6 +11,7 @@ python scaffold.py
 ## Steps
 
 - [x] **1.** convolve2d
+- [x] **2.** gaussian_kernel1d
 
 ---
 

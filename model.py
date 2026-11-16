@@ -103,3 +103,45 @@ def convolve2d(img, kernel, pad="reflect"):
 
     return output
 
+# Step 2 - gaussian_kernel1d
+def gaussian_kernel1d(sigma, radius=None):
+    """
+    Generate a normalized 1-D Gaussian kernel.
+
+    Parameters
+    ----------
+    sigma : float
+        Standard deviation of the Gaussian distribution.
+        Must be strictly positive.
+
+    radius : int, optional
+        Radius of the kernel. The resulting kernel has length
+        2 * radius + 1.
+        If None, the default radius is ceil(3 * sigma).
+
+    Returns
+    -------
+    np.ndarray
+        A normalized 1-D Gaussian kernel whose entries sum to 1.
+    """
+
+    # Validate the standard deviation.
+    if sigma <= 0:
+        raise ValueError("Sigma must be greater than zero.")
+
+    # Use ceil(3 * sigma) as the default radius.
+    # This captures approximately 99.7% of the Gaussian mass.
+    if radius is None:
+        radius = int(np.ceil(3 * sigma))
+
+    # Generate coordinates from -radius to +radius.
+    x = np.arange(-radius, radius + 1, dtype=float)
+
+    # Evaluate the Gaussian function at each coordinate.
+    kernel = np.exp(-(x ** 2) / (2 * sigma ** 2))
+
+    # Normalize the kernel so that all entries sum to 1.
+    kernel /= np.sum(kernel)
+
+    return kernel
+
