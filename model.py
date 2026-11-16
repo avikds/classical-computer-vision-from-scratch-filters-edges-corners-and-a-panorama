@@ -2274,3 +2274,80 @@ def feather_weights(shape):
     # Return the weight map as a floating-point array.
     return weights.astype(float)
 
+# Step 27 - match_exposure
+def match_exposure(ref, img, mask):
+    """
+    Estimate the gain and offset required to match the exposure
+    of an image to a reference image using least squares.
+
+    Parameters
+    ----------
+    ref : np.ndarray
+        Reference image containing the target brightness values.
+
+    img : np.ndarray
+        Input image whose exposure needs to be adjusted.
+
+    mask : np.ndarray
+        Boolean array indicating the pixels used for exposure matching.
+        Only pixels where mask is True are considered.
+
+    Returns
+    -------
+    tuple
+        (gain, offset), both returned as Python floats.
+
+        The exposure correction is:
+
+            adjusted_img = gain * img + offset
+
+    Raises
+    ------
+    ValueError
+        If the mask selects fewer than two pixels or the input
+        arrays have incompatible shapes.
+    """
+
+    # Convert inputs to NumPy arrays with appropriate data types.
+    ref = np.asarray(ref, dtype=float)
+    img = np.asarray(img, dtype=float)
+    mask = np.asarray(mask, dtype=bool)
+
+    # Validate that all input arrays have identical shapes.
+    if ref.shape != img.shape or ref.shape != mask.shape:
+        raise ValueError("ref, img, and mask must have the same shape.")
+
+    # Extract reference and input image intensities only
+    # at locations selected by the mask.
+    ref_values = ref[mask]
+    img_values = img[mask]
+
+    # At least two valid pixels are required for least-squares fitting.
+    if img_values.size < 2:
+        raise ValueError("The mask must select at least two pixels.")
+
+    # Construct the design matrix:
+    # First column contains input image intensities.
+    # Second column contains ones for the offset term.
+    A = np.column_stack((
+        img_values,
+        np.ones(img_values.size)
+    ))
+
+    # Solve the least-squares problem:
+    #
+    # gain * img_values + offset ≈ ref_values
+    #
+    # The solution contains [gain, offset].
+    solution, _, _, _ = np.linalg.lstsq(
+        A,
+        ref_values,
+        rcond=None
+    )
+
+    # Extract the estimated gain and offset as Python floats.
+    gain = float(solution[0])
+    offset = float(solution[1])
+
+    return gain, offset
+

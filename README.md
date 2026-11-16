@@ -36,6 +36,7 @@ python scaffold.py
 - [x] **24.** warp_image
 - [x] **25.** panorama_canvas
 - [x] **26.** feather_weights
+- [x] **27.** match_exposure
 
 ---
 
