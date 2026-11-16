@@ -421,3 +421,47 @@ def hysteresis_threshold(strength, low, high):
 
     return edges
 
+# Step 7 - canny
+def canny(img, sigma=1.0, low=0.02, high=0.05):
+    """
+    Perform Canny edge detection on a grayscale image.
+
+    Parameters
+    ----------
+    img : np.ndarray
+        2-D grayscale input image.
+
+    sigma : float, default=1.0
+        Standard deviation of the Gaussian smoothing kernel.
+
+    low : float, default=0.02
+        Lower threshold for weak edge detection.
+
+    high : float, default=0.05
+        Upper threshold for strong edge detection.
+
+    Returns
+    -------
+    np.ndarray
+        Boolean edge map with the same dimensions as the input image.
+    """
+
+    # Step 1: Smooth the image using Gaussian blur.
+    # This reduces noise before computing image gradients.
+    blurred = gaussian_blur(img, sigma)
+
+    # Step 2: Compute horizontal and vertical gradients,
+    # gradient magnitude, and gradient direction using Sobel operators.
+    _, _, mag, theta = sobel_gradients(blurred)
+
+    # Step 3: Apply Non-Maximum Suppression to retain
+    # only local maxima along the gradient direction.
+    thinned = non_max_suppression(mag, theta)
+
+    # Step 4: Apply hysteresis thresholding.
+    # Retain strong edges and weak edges connected to strong edges.
+    edges = hysteresis_threshold(thinned, low, high)
+
+    # Return the final Boolean edge map.
+    return edges
+
