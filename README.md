@@ -12,6 +12,7 @@ python scaffold.py
 
 - [x] **1.** convolve2d
 - [x] **2.** gaussian_kernel1d
+- [x] **3.** gaussian_blur
 
 ---
 

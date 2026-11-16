@@ -145,3 +145,50 @@ def gaussian_kernel1d(sigma, radius=None):
 
     return kernel
 
+# Step 3 - gaussian_blur
+def gaussian_blur(img, sigma):
+    """
+    Apply Gaussian blur to a grayscale image using separable convolution.
+
+    Parameters
+    ----------
+    img : np.ndarray
+        2-D grayscale input image.
+
+    sigma : float
+        Standard deviation of the Gaussian kernel.
+        A value of zero returns an unchanged floating-point copy.
+
+    Returns
+    -------
+    np.ndarray
+        Blurred image as a floating-point array with the same
+        dimensions as the input image.
+    """
+
+    # Convert the input image to floating point.
+    img = np.asarray(img, dtype=float)
+
+    # If sigma is zero, return a new floating-point copy without blurring.
+    if sigma == 0:
+        return img.copy()
+
+    # Generate the normalized 1-D Gaussian kernel.
+    g = gaussian_kernel1d(sigma)
+
+    # First pass: convolve horizontally using a row kernel.
+    horizontal_blur = convolve2d(
+        img,
+        g[None, :],
+        pad="reflect"
+    )
+
+    # Second pass: convolve vertically using a column kernel.
+    blurred_img = convolve2d(
+        horizontal_blur,
+        g[:, None],
+        pad="reflect"
+    )
+
+    return blurred_img
+
