@@ -342,3 +342,82 @@ def non_max_suppression(mag, theta):
 
     return suppressed
 
+# Step 6 - hysteresis_threshold
+def hysteresis_threshold(strength, low, high):
+    """
+    Apply hysteresis thresholding to retain weak edges connected
+    to at least one strong edge.
+
+    Parameters
+    ----------
+    strength : np.ndarray
+        2-D array containing edge strength values.
+
+    low : float
+        Lower threshold. Pixels with strength >= low are
+        classified as weak edges.
+
+    high : float
+        Upper threshold. Pixels with strength >= high are
+        classified as strong edges.
+
+    Returns
+    -------
+    np.ndarray
+        Boolean array indicating retained edge pixels.
+        Strong edges and weak edges connected to strong edges
+        are True; all other pixels are False.
+    """
+
+    # Convert the input to a NumPy array.
+    strength = np.asarray(strength)
+
+    # Validate that the input is a 2-D array.
+    if strength.ndim != 2:
+        raise ValueError("Strength must be a 2-D array.")
+
+    # Identify weak and strong edge pixels.
+    weak = strength >= low
+    strong = strength >= high
+
+    # Initialize the output with all strong edge pixels.
+    edges = strong.copy()
+
+    # Get the image dimensions.
+    h, w = strength.shape
+
+    # Initialize a stack with the coordinates of all strong pixels.
+    # These pixels act as starting points for edge connectivity.
+    stack = [tuple(point) for point in np.argwhere(strong)]
+
+    # Perform iterative depth-first search to find connected weak edges.
+    while stack:
+
+        # Retrieve the current strong or already-connected edge pixel.
+        r, c = stack.pop()
+
+        # Examine all eight neighboring pixels, including diagonals.
+        for dr in (-1, 0, 1):
+            for dc in (-1, 0, 1):
+
+                # Skip the current pixel itself.
+                if dr == 0 and dc == 0:
+                    continue
+
+                nr = r + dr
+                nc = c + dc
+
+                # Check that the neighboring pixel is inside the image.
+                if 0 <= nr < h and 0 <= nc < w:
+
+                    # Retain weak neighbors that have not already been visited.
+                    if weak[nr, nc] and not edges[nr, nc]:
+
+                        # Mark the connected weak edge as retained.
+                        edges[nr, nc] = True
+
+                        # Continue searching from this newly connected pixel.
+                        stack.append((nr, nc))
+
+    return edges
+

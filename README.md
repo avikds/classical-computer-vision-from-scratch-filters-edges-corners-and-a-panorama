@@ -15,6 +15,7 @@ python scaffold.py
 - [x] **3.** gaussian_blur
 - [x] **4.** sobel_gradients
 - [x] **5.** non_max_suppression
+- [x] **6.** hysteresis_threshold
 
 ---
 
