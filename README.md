@@ -26,6 +26,7 @@ python scaffold.py
 - [x] **14.** normalize_points
 - [x] **15.** dlt_homography
 - [x] **16.** transfer_error
+- [x] **17.** describe_patches
 
 ---
 

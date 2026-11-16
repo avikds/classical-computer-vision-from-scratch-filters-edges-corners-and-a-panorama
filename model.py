@@ -1255,3 +1255,161 @@ def transfer_error(H, p1, p2):
 
     return errors.astype(float)
 
+# Step 17 - describe_patches
+def describe_patches(img, pts, size=8, spacing=2, sigma=None):
+    """
+    Generate normalized patch descriptors around detected points.
+
+    Parameters
+    ----------
+    img : np.ndarray
+        2-D grayscale input image.
+
+    pts : np.ndarray
+        Corner coordinates with shape (N, 2).
+        Coordinates are provided in (x, y) = (column, row) order.
+
+    size : int, default=8
+        Number of samples along each dimension of the patch.
+        Each descriptor contains size * size elements.
+
+    spacing : int, default=2
+        Distance in pixels between consecutive sampling locations.
+
+    sigma : float, optional
+        Standard deviation of the Gaussian blur.
+        Defaults to spacing when None.
+
+    Returns
+    -------
+    desc : np.ndarray
+        Normalized patch descriptors with shape
+        (number_of_kept_points, size * size).
+
+    keep : np.ndarray
+        Boolean array of shape (N,).
+        True indicates that the complete sampling grid
+        around the corresponding point lies inside the image.
+
+    Raises
+    ------
+    ValueError
+        If spacing * (size - 1) is odd, or input dimensions
+        are invalid.
+    """
+
+    # Convert the image and point coordinates into NumPy arrays.
+    img = np.asarray(img, dtype=float)
+    pts = np.asarray(pts, dtype=float)
+
+    # Validate the grayscale image.
+    if img.ndim != 2:
+        raise ValueError("img must be a 2-D grayscale image.")
+
+    # Validate the point coordinates.
+    if pts.ndim != 2 or pts.shape[1] != 2:
+        raise ValueError("pts must have shape (N, 2).")
+
+    # Ensure that patch size is a positive integer.
+    if not isinstance(size, (int, np.integer)) or size <= 0:
+        raise ValueError("size must be a positive integer.")
+
+    # Ensure that spacing is an integer.
+    if not isinstance(spacing, (int, np.integer)):
+        raise ValueError("spacing must be an integer.")
+
+    # Calculate the total sampling span.
+    span = spacing * (size - 1)
+
+    # The sampling offsets must be integers symmetric about zero.
+    # An odd span would place the sampling grid between pixel centers.
+    if span % 2 != 0:
+        raise ValueError(
+            "spacing * (size - 1) must be even."
+        )
+
+    # If sigma is not specified, use spacing as the Gaussian
+    # standard deviation.
+    if sigma is None:
+        sigma = spacing
+
+    # Step 1: Apply Gaussian smoothing before extracting patches.
+    # This helps reduce sensitivity to small image variations.
+    blurred = gaussian_blur(img, sigma)
+
+    # Step 2: Generate symmetric sampling offsets.
+    # For the default size=8 and spacing=2:
+    # offsets = [-7, -5, -3, -1, 1, 3, 5, 7].
+    offsets = (
+        np.arange(size, dtype=int) * spacing - span // 2
+    )
+
+    # Get image dimensions.
+    h, w = blurred.shape
+
+    # Initialize a Boolean mask for valid sampling locations.
+    keep = np.zeros(len(pts), dtype=bool)
+
+    # Store the normalized descriptors of valid points.
+    descriptors = []
+
+    # Step 3: Process each detected corner.
+    for i, (x, y) in enumerate(pts):
+
+        # Round the corner coordinates to the nearest integer pixel.
+        x = int(np.rint(x))
+        y = int(np.rint(y))
+
+        # Calculate the complete sampling grid boundaries.
+        x_min = x + offsets.min()
+        x_max = x + offsets.max()
+
+        y_min = y + offsets.min()
+        y_max = y + offsets.max()
+
+        # Check whether every sampling location lies inside the image.
+        # Points with incomplete sampling grids are discarded.
+        if (
+            x_min < 0 or
+            x_max >= w or
+            y_min < 0 or
+            y_max >= h
+        ):
+            continue
+
+        # Mark this point as valid.
+        keep[i] = True
+
+        # Step 4: Extract the size x size patch.
+        # Rows correspond to y + offsets and columns to x + offsets.
+        # Advanced indexing preserves row-by-row sampling order.
+        patch = blurred[
+            y + offsets[:, None],
+            x + offsets[None, :]
+        ]
+
+        # Flatten the patch into a one-dimensional descriptor.
+        descriptor = patch.flatten()
+
+        # Step 5: Normalize the descriptor.
+        # Subtract the mean to obtain zero-mean values.
+        descriptor = descriptor - descriptor.mean()
+
+        # Divide by the standard deviation with a small epsilon
+        # to prevent division by zero for constant patches.
+        descriptor = descriptor / (
+            descriptor.std() + 1e-8
+        )
+
+        # Store the normalized descriptor.
+        descriptors.append(descriptor)
+
+    # Convert the collected descriptors into a 2-D floating-point array.
+    # The reshape also guarantees the correct shape when no points survive.
+    desc = np.asarray(
+        descriptors,
+        dtype=float
+    ).reshape(-1, size * size)
+
+    return desc, keep
+
