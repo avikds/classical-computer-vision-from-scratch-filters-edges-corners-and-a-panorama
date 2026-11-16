@@ -35,6 +35,7 @@ python scaffold.py
 - [x] **23.** bilinear_sample
 - [x] **24.** warp_image
 - [x] **25.** panorama_canvas
+- [x] **26.** feather_weights
 
 ---
 

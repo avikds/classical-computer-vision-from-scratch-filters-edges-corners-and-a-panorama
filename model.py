@@ -2221,3 +2221,56 @@ def panorama_canvas(shape1, shape2, H):
 
     return T, out_shape
 
+# Step 26 - feather_weights
+def feather_weights(shape):
+    """
+    Generate a feather weight map for an image.
+
+    Pixel weights are highest toward the center and decrease
+    linearly toward the image boundaries.
+
+    Parameters
+    ----------
+    shape : tuple
+        Image dimensions as (height, width).
+
+    Returns
+    -------
+    np.ndarray
+        Floating-point weight map of shape (height, width).
+        Every weight is at least 1.
+    """
+
+    # Extract image height and width.
+    h, w = shape
+
+    # Validate image dimensions.
+    if h < 1 or w < 1:
+        raise ValueError("Image dimensions must be positive.")
+
+    # Generate column and row coordinates.
+    x = np.arange(w, dtype=float)
+    y = np.arange(h, dtype=float)
+
+    # Calculate the minimum horizontal distance to the boundaries.
+    horizontal_dist = np.minimum(
+        x + 1,
+        w - x
+    )
+
+    # Calculate the minimum vertical distance to the boundaries.
+    vertical_dist = np.minimum(
+        y + 1,
+        h - y
+    )
+
+    # Combine horizontal and vertical distances using broadcasting.
+    # The resulting array has shape (height, width).
+    weights = np.minimum(
+        horizontal_dist[None, :],
+        vertical_dist[:, None]
+    )
+
+    # Return the weight map as a floating-point array.
+    return weights.astype(float)
+
